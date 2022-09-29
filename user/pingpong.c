@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
         char rstr[5] = {};
         read(pipe_p2c[0], rstr, 4);
         close(pipe_p2c[0]);    //读取完成，关闭读端 
-        printf("%d:received %s\n", getpid(), rstr);
+        printf("%d: received %s\n", getpid(), rstr);
 	    char wstr[] = "pong";
 	    write(pipe_c2p[1], wstr, 4);
 	    close(pipe_c2p[1]);
@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
         char rstr[5] = {};
         read(pipe_c2p[0], rstr, 4);
         close(pipe_c2p[0]);    //读取完成，关闭读端 
-        printf("%d:received %s\n", getpid(), rstr);
+        printf("%d: received %s\n", getpid(), rstr);
     }
     exit(0);
 }
