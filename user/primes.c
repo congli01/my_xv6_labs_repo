@@ -34,6 +34,7 @@ void filtrate(int p1[])
                 write(p2[1], &num, sizeof(num));
             }
         }
+        close(p1[0]);
         close(p2[1]);
         wait(0);    // 等待子进程退出
     }
