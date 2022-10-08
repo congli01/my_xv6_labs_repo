@@ -104,6 +104,8 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -127,7 +129,15 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
 };
+
+// 数组保存每个系统调用的名称
+static char syscall_name[25][15] = {"sys_fork", "sys_exit", "sys_wait", "sys_pipe", "sys_read", "sys_kill",
+                                    "sys_exec", "sys_fstat", "sys_chdir", "sys_dup", "sys_getpid", "sys_sbrk",
+                                    "sys_sleep", "sys_uptime", "sys_open", "sys_write", "sys_mknode", "sys_unlink",
+                                    "sys_link", "sys_mkdir", "sys_close", "sys_trace", "sys_sysinfo"};
 
 void
 syscall(void)
@@ -136,8 +146,14 @@ syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
+  int arg = p->trapframe->a0;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     p->trapframe->a0 = syscalls[num]();
+    if (p->mask >0 && (p->mask & (1 << num)))
+    {
+      // 打印系统调用的信息 PID: sys_$name(arg0) -> return_value
+      printf("%d: %s(%d) -> %d\n", p->pid, syscall_name[num-1], arg, p->trapframe->a0);
+    }
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);

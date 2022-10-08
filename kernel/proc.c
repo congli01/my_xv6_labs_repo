@@ -277,6 +277,9 @@ fork(void)
 
   np->parent = p;
 
+  // 继承父进程的mask
+  np->mask = p->mask;
+
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -692,4 +695,39 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// 计算空闲进程数量
+int
+unused_proc_num(void)
+{
+  int num = 0;
+  int index;
+  // 遍历进程数组中的所有进程，找到状态为UNUSED的
+  for (index = 0;index < NPROC;index++)
+  {
+    acquire(&proc[index].lock);
+    if (proc[index].state == UNUSED)
+    {
+      num ++;    
+    }
+    release(&proc[index].lock);
+  }
+  return num;
+}
+
+// 计算可用文件描述符数量
+int
+free_file_num(void)
+{
+  int num = 0;
+  struct proc *p = myproc();
+  for(int fd = 0; fd < NOFILE; fd++)
+  {
+    if(p->ofile[fd] == 0)
+    {
+      num ++;
+    }
+  }
+  return num;
 }

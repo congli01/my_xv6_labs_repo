@@ -80,3 +80,22 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+// 计算剩余的内存空间
+uint64
+remaining_mem(void)
+{
+  struct run *r;
+  int pgnum = 0;  // 剩余页表的数量
+  
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  while(r)
+  {
+    pgnum ++;
+    r = r->next;
+  }
+  release(&kmem.lock);
+  return pgnum * PGSIZE;  // 返回剩余的页表数量乘每个页表的大小
+
+}
