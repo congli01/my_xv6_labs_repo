@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "spinlock.h": "c",
+        "typeinfo": "c",
+        "cmath": "c",
+        "*.tcc": "c"
+    }
+}
