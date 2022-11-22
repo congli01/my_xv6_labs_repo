@@ -37,6 +37,10 @@ procinit(void)
       char *pa = kalloc();
       if(pa == 0)
         panic("kalloc");
+      // lab4(2)
+      // 把procinit()中内核栈的物理地址pa拷贝到PCB新增的成员kstack_pa中
+      // 同时还需要保留内核栈在全局页表kernel_pagetable的映射
+      p->kstack_pa = (uint64)pa;
       uint64 va = KSTACK((int) (p - proc));
       kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
       p->kstack = va;
@@ -121,6 +125,13 @@ found:
     return 0;
   }
 
+  // lab4(2)
+  // 为进程分配独立内核页表
+  p->k_pagetable = indep_kvminit();
+  // 将设置的内核栈映射到页表k_pagetable里。
+  mappages(p->k_pagetable, p->kstack, PGSIZE, (uint64)p->kstack_pa, PTE_R|PTE_W);
+  
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -128,6 +139,25 @@ found:
   p->context.sp = p->kstack + PGSIZE;
 
   return p;
+}
+
+// lab4(2)
+// 释放页表但不释放叶子页表指向的物理页帧
+void free_kernel_pagetable(pagetable_t pagetable)
+{
+  for (int i = 0; i < 512; i++)
+  {
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      free_kernel_pagetable((pagetable_t)child);
+      pagetable[i] = 0;  
+    } else if(pte & PTE_V){
+      pagetable[i] = 0;
+    }
+  }
+  kfree((void *)pagetable);
 }
 
 // free a proc structure and the data hanging from it,
@@ -141,6 +171,13 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  // lab4(2)
+  // 释放内核页表
+  if(p->k_pagetable)
+  {
+    free_kernel_pagetable(p->k_pagetable);
+  }
+  p->k_pagetable = 0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -221,6 +258,9 @@ userinit(void)
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+  // lab4(3)
+  user2kernel(p->pagetable, p->k_pagetable, 0, p->sz);
+
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -243,11 +283,24 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
+    // 判断是否超过内核起始地址
+    if (PGROUNDUP(sz+n) > PLIC)
+    {
+      return -1;
+    }
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    // 将新增的用户页表映射到内核页表
+    user2kernel(p->pagetable, p->k_pagetable, p->sz, sz);
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
+    // 将缩减的用户页表从内核页表中删除
+    if(PGROUNDUP(sz) < PGROUNDUP(p->sz))
+    {
+      int shrink = (PGROUNDUP(p->sz) - PGROUNDUP(sz)) / PGSIZE;
+      uvmunmap(p->k_pagetable, PGROUNDUP(sz), shrink, 0);
+    }
   }
   p->sz = sz;
   return 0;
@@ -276,6 +329,9 @@ fork(void)
   np->sz = p->sz;
 
   np->parent = p;
+
+  // lab4(3)
+  user2kernel(np->pagetable, np->k_pagetable, 0, np->sz);
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -473,6 +529,11 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        // lab4(2)
+        w_satp(MAKE_SATP(p->k_pagetable));
+        sfence_vma();
+
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
@@ -480,6 +541,9 @@ scheduler(void)
         c->proc = 0; // cpu dosen't run any process now
 
         found = 1;
+
+        // 当目前没有进程运行的时候,切回全局页表
+        kvminithart();
       }
       release(&p->lock);
     }

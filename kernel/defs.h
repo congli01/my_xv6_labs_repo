@@ -179,6 +179,15 @@ int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 int             test_pagetable();
+void            vmprint(pagetable_t); //lab4(1)
+pagetable_t     indep_kvminit(void);    // lab4(2)
+void            indep_kvmmap(pagetable_t, uint64, uint64, uint64, int); // lab4(2)
+pte_t *         walk(pagetable_t, uint64, int);     // lab4(2)   
+int             user2kernel(pagetable_t, pagetable_t, uint64, uint64);  // lab4(3)
+
+// vmcopyin
+int             copyin_new(pagetable_t, char *, uint64, uint64);
+int             copyinstr_new(pagetable_t, char *, uint64, uint64);
 
 // plic.c
 void            plicinit(void);
